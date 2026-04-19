@@ -136,7 +136,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 </div>
 
 <script>
-const OR_KEY = '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';
+const OR_KEY = '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';
 
 const SYSTEM = `Tu es le Coach IA d'Amadou Niang, manager commercial en alternance a La Banque Postale, Clermont-Ferrand. Tu aides les etudiants, alternants et jeunes porteurs de projets — notamment de la diaspora africaine en France — a clarifier leur orientation, structurer leur projet, developper leur activite et construire leur image.
 
@@ -208,7 +208,7 @@ async function sendMessage() {
         'HTTP-Referer': 'https://niangamadou394-star.github.io/coach-etudiant/',
         'X-Title': 'CoachIA — Amadou Niang'
       },
-      body: JSON.stringify({ model: 'anthropic/claude-3-5-sonnet', max_tokens: 400, messages })
+      body: JSON.stringify({ model: 'anthropic/claude-sonnet-4.6', max_tokens: 400, messages })
     });
     const data = await res.json();
     const reply = data.choices?.[0]?.message?.content || "Desole, reessaie !";
