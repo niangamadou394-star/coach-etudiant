@@ -37,6 +37,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 .header-by strong { color: var(--gold); font-weight: 600; }
 .chat-wrap { background: var(--bg2); border: 1px solid var(--b1); border-radius: 16px; overflow: hidden; animation: fadeUp .8s .2s both; }
 .chat-top { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--b1); background: var(--bg3); }
+.clear-btn { margin-left: auto; font-size: 11px; font-family: var(--sans); color: var(--t3); background: transparent; border: 1px solid var(--t3); border-radius: 20px; padding: 4px 12px; cursor: pointer; transition: all .2s; flex-shrink: 0; }
+.clear-btn:hover { color: var(--text); border-color: var(--text); }
 .chat-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), #e8a820); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 .chat-name { font-size: 14px; font-weight: 600; font-family: var(--serif); }
 .chat-status { font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 5px; margin-top: 2px; }
@@ -99,26 +101,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
         <div class="chat-name">Coach IA — Propulse par Amadou Niang</div>
         <div class="chat-status">En ligne · Pret a t'accompagner</div>
       </div>
+      <button class="clear-btn" onclick="clearHistory()">Nouvelle conversation</button>
     </div>
 
-    <div class="chat-messages" id="messages">
-      <div class="msg bot">
-        <div class="msg-avatar">🎯</div>
-        <div>
-          <div class="msg-bubble">
-            Salut ! Je suis ton coach personnel propulse par l'IA. 👋<br><br>
-            Je suis la pour t'aider a <strong>clarifier ton projet</strong>, trouver ta direction et passer a l'action — que tu sois etudiant, alternant, ou porteur de projet.<br><br>
-            Par quoi tu veux commencer ?
-          </div>
-          <div class="quick-replies">
-            <button class="qr-btn" onclick="sendQuick('Je ne sais pas encore ce que je veux faire')">🤔 Je ne sais pas quoi faire</button>
-            <button class="qr-btn" onclick="sendQuick('J\'ai une idee de projet mais je ne sais pas comment la lancer')">💡 J'ai une idee de projet</button>
-            <button class="qr-btn" onclick="sendQuick('Je cherche comment trouver mes premiers clients')">🎯 Trouver mes premiers clients</button>
-            <button class="qr-btn" onclick="sendQuick('Je veux ameliorer mon profil LinkedIn et mon personal branding')">✨ Ameliorer mon image</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="chat-messages" id="messages"></div>
 
     <div class="chat-input-wrap">
       <textarea class="chat-input" id="userInput" placeholder="Ecris ton message ici..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
@@ -136,20 +122,61 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 </div>
 
 <script>
+const SYSTEM = `Tu es le Coach IA d'Amadou Niang, manager commercial en alternance a La Banque Postale, Clermont-Ferrand. Tu aides les etudiants, alternants et jeunes porteurs de projets a clarifier leur orientation, structurer leur projet, developper leur activite et construire leur image.
 
+REGLES ABSOLUES — lis-les avant chaque reponse :
+1. Donne TOUJOURS des conseils concrets et actionnables des le premier message. Ne commence JAMAIS par poser des questions sans avoir deja donne quelque chose d'utile.
+2. Structure systématiquement : une ligne de diagnostic rapide, puis 2 ou 3 actions numerotées très precises (avec exemples concrets, textes a copier, outils nommés), puis eventuellement une seule question pour affiner si vraiment nécessaire.
+3. Sois ultra-concret : au lieu de "travaille ton LinkedIn", dis "Ajoute dans ton titre LinkedIn : [exemple precis]. Poste ce message : [exemple precis]".
+4. Max 160 mots. Tutoie toujours. Chaleureux, direct, motivant. Emojis avec parcimonie.
+5. Si la situation est complexe ou demande un suivi personnalise, propose la session decouverte gratuite de 30 min : niangamadou394@gmail.com ou WhatsApp 06 17 56 63 42.
 
-const SYSTEM = `Tu es le Coach IA d'Amadou Niang, manager commercial en alternance a La Banque Postale, Clermont-Ferrand. Tu aides les etudiants, alternants et jeunes porteurs de projets — notamment de la diaspora africaine en France — a clarifier leur orientation, structurer leur projet, developper leur activite et construire leur image.
+Domaines : orientation/projet de vie, entrepreneuriat, developpement commercial (trouver ses premiers clients), personal branding et LinkedIn, CV et pitch.
 
-Style : chaleureux, direct, motivant. Tu tutoies toujours. Reponses courtes et actionnables (max 120 mots). Tu poses UNE seule question a la fois. Emojis avec parcimonie. Tu es honnete — pas de miracles, des actions concretes.
+Rappel : une reponse sans actions concretes est une mauvaise reponse. L'utilisateur repart avec quelque chose a faire aujourd'hui.`;
 
-4 domaines : 1) Accompagnement entrepreneurial (ideation, marche, business model, lancement) 2) Developpement commercial (prospection, premiers clients) 3) Personal branding (LinkedIn, image, contenu) 4) Creation de supports (CV, pitch).
-
-Si besoin d'accompagnement humain : niangamadou394@gmail.com ou WhatsApp 06 17 56 63 42. Session decouverte gratuite 30 min.
-
-Commence toujours par comprendre la situation avant de conseiller.`;
-
+const STORAGE_KEY = 'coachia_v1';
 let history = [];
 let loading = false;
+
+function saveHistory() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(history)); } catch(e) {}
+}
+
+function loadHistory() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    history = JSON.parse(saved);
+    const wrap = document.getElementById('messages');
+    history.forEach(msg => {
+      const role = msg.role === 'user' ? 'user' : 'bot';
+      const html = msg.content.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+      const d = document.createElement('div');
+      d.className = `msg ${role}`;
+      d.innerHTML = `<div class="msg-avatar">${role === 'bot' ? '🎯' : '👤'}</div><div class="msg-bubble">${html}</div>`;
+      wrap.appendChild(d);
+    });
+    wrap.scrollTop = wrap.scrollHeight;
+  } catch(e) { history = []; }
+}
+
+function clearHistory() {
+  if (!confirm('Effacer la conversation ?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  history = [];
+  const wrap = document.getElementById('messages');
+  wrap.innerHTML = '';
+  addWelcome();
+}
+
+function addWelcome() {
+  const wrap = document.getElementById('messages');
+  const d = document.createElement('div');
+  d.className = 'msg bot';
+  d.innerHTML = `<div class="msg-avatar">🎯</div><div><div class="msg-bubble">Salut ! Je suis ton coach personnel propulse par l'IA. 👋<br><br>Je suis la pour t'aider a <strong>clarifier ton projet</strong>, trouver ta direction et passer a l'action — que tu sois etudiant, alternant, ou porteur de projet.<br><br>Par quoi tu veux commencer ?</div><div class="quick-replies"><button class="qr-btn" onclick="sendQuick('Je ne sais pas encore ce que je veux faire')">🤔 Je ne sais pas quoi faire</button><button class="qr-btn" onclick="sendQuick('J\'ai une idee de projet mais je ne sais pas comment la lancer')">💡 J'ai une idee de projet</button><button class="qr-btn" onclick="sendQuick('Je cherche comment trouver mes premiers clients')">🎯 Trouver mes premiers clients</button><button class="qr-btn" onclick="sendQuick('Je veux ameliorer mon profil LinkedIn et mon personal branding')">✨ Ameliorer mon image</button></div></div>`;
+  wrap.appendChild(d);
+}
 
 function autoResize(el) {
   el.style.height = 'auto';
@@ -197,6 +224,7 @@ async function sendMessage() {
   loading = true; btn.disabled = true;
   addMsg('user', text.replace(/\n/g,'<br>'));
   history.push({ role: 'user', content: text });
+  saveHistory();
   showTyping();
   try {
     const messages = [{ role: 'system', content: SYSTEM }, ...history];
@@ -209,6 +237,7 @@ async function sendMessage() {
     const reply = data.choices?.[0]?.message?.content || "Desole, reessaie !";
     removeTyping();
     history.push({ role: 'assistant', content: reply });
+    saveHistory();
     addMsg('bot', reply.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>'));
   } catch(e) {
     removeTyping();
@@ -216,6 +245,14 @@ async function sendMessage() {
   }
   loading = false; btn.disabled = false;
   document.getElementById('userInput').focus();
+}
+
+// Init
+const wrap = document.getElementById('messages');
+if (wrap.children.length === 0 || localStorage.getItem(STORAGE_KEY)) {
+  wrap.innerHTML = '';
+  loadHistory();
+  if (history.length === 0) addWelcome();
 }
 </script>
 </body>
